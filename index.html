@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI News & Sentiment Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d2d3a; /* A custom dark teal for the very background */
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #2dd4bf;
+            width: 24px;
+            height: 24px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .sentiment-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        /* Custom Toggle Switch Styles */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #14b8a6;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #14b8a6;
+        }
+    </style>
+</head>
+<body class="bg-teal-950 text-gray-200 min-h-screen p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-teal-300">AI News & Sentiment Analyzer</h1>
+            <p class="text-teal-400 mt-2">Fetches, analyzes, and sends notifications for top business headlines.</p>
+        </header>
+
+        <!-- Configuration Section -->
+        <div class="bg-teal-900 bg-opacity-50 p-6 rounded-lg shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold mb-4 border-b border-teal-800 pb-2 text-teal-200">Configuration</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <!-- NewsAPI -->
+                <div class="md-col-span-1">
+                    <h3 class="text-lg font-semibold text-teal-300 mb-2">NewsAPI Key</h3>
+                    <input type="password" id="newsApiKey" placeholder="Your NewsAPI Key" class="w-full bg-teal-800 text-white rounded-md p-2 border border-teal-700 focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                </div>
+                
+                <!-- Gemini API -->
+                <div class="md-col-span-1">
+                    <h3 class="text-lg font-semibold text-teal-300 mb-2">Gemini API Key</h3>
+                     <input type="password" id="geminiApiKey" placeholder="Your Gemini API Key" class="w-full bg-teal-800 text-white rounded-md p-2 border border-teal-700 focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                </div>
+
+                <!-- Pushover -->
+                <div class="md-col-span-2">
+                    <h3 class="text-lg font-semibold text-teal-300 mb-2 mt-2">Pushover Keys</h3>
+                    <div class="flex items-center gap-4">
+                        <input type="text" id="pushoverUserKey" placeholder="Pushover User Key" class="w-full bg-teal-800 text-white rounded-md p-2 border border-teal-700 focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        <input type="password" id="pushoverApiToken" placeholder="Pushover API Token" class="w-full bg-teal-800 text-white rounded-md p-2 border border-teal-700 focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        <div class="flex items-center justify-center space-x-2">
+                            <label for="pushoverSwitch" class="text-sm text-teal-200">Enable:</label>
+                            <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                <input type="checkbox" name="toggle" id="pushoverSwitch" checked class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                <label for="pushoverSwitch" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer"></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- News Sources Section -->
+        <div class="bg-teal-900 bg-opacity-50 p-6 rounded-lg shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold mb-4 border-b border-teal-800 pb-2 text-teal-200">News Sources & Filters</h2>
+            <div id="sourcesContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <!-- Checkboxes will be populated by JS -->
+            </div>
+            <div class="mt-6 pt-4 border-t border-teal-800 flex justify-end items-center">
+                 <label for="hideNoCompanySwitch" class="text-sm text-teal-200 mr-2">Hide articles with no company identified:</label>
+                 <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" name="toggle" id="hideNoCompanySwitch" checked class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                    <label for="hideNoCompanySwitch" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer"></label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Button and Status -->
+        <div class="text-center mb-8">
+            <button id="fetchBtn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-transform transform hover:scale-105 w-full sm:w-auto flex items-center justify-center mx-auto">
+                <span id="btnText">Fetch, Analyze & Notify</span>
+                <div id="loader" class="loader ml-3 hidden"></div>
+            </button>
+            <div id="status" class="mt-4 text-teal-400 h-6"></div>
+        </div>
+        
+        <!-- Results Section -->
+        <div id="results" class="bg-teal-900 bg-opacity-50 p-6 rounded-lg shadow-lg min-h-[100px]">
+             <h2 class="text-2xl font-semibold mb-4 text-teal-400">Results will appear here...</h2>
+             <div id="articlesList" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // =================================================================
+            // SCRIPT INITIALIZATION
+            // =================================================================
+
+            // --- Variable Declarations ---
+            // Stores the master list of articles from a fetch operation.
+            let allFetchedArticles = []; 
+            
+            // --- UI Element References ---
+            const fetchBtn = document.getElementById('fetchBtn');
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            const articlesList = document.getElementById('articlesList');
+            const sourcesContainer = document.getElementById('sourcesContainer');
+            const hideNoCompanySwitch = document.getElementById('hideNoCompanySwitch');
+            const btnText = document.getElementById('btnText');
+            const loader = document.getElementById('loader');
+
+            // --- Initial UI Setup ---
+            const availableSources = {
+                'Bloomberg': 'bloomberg', 'Reuters': 'reuters', 'Wall St Journal': 'the-wall-street-journal',
+                'CNBC': 'cnbc', 'Business Insider': 'business-insider', 'Financial Times': 'financial-times'
+            };
+            
+            // Dynamically create checkboxes for each news source.
+            for (const [name, id] of Object.entries(availableSources)) {
+                const label = document.createElement('label');
+                label.className = "flex items-center space-x-2 text-gray-300 cursor-pointer hover:text-white";
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox'; checkbox.value = id;
+                checkbox.className = 'form-checkbox h-5 w-5 text-teal-500 bg-teal-800 border-teal-700 rounded focus:ring-teal-500';
+                checkbox.checked = true; // Select all by default
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(name));
+                sourcesContainer.appendChild(label);
+            }
+
+            // --- Event Listeners ---
+            fetchBtn.addEventListener('click', fetchAndAnalyze);
+            // Re-render the article list when the filter toggle is changed, without re-fetching.
+            hideNoCompanySwitch.addEventListener('change', () => displayArticles()); 
+
+            // =================================================================
+            // CORE APPLICATION LOGIC
+            // =================================================================
+
+            /**
+             * Main function to orchestrate the fetching and analysis process.
+             */
+            async function fetchAndAnalyze() {
+                // 1. Gather all user inputs from the form fields.
+                const newsApiKey = document.getElementById('newsApiKey').value.trim();
+                const geminiApiKey = document.getElementById('geminiApiKey').value.trim();
+                const pushoverUserKey = document.getElementById('pushoverUserKey').value.trim();
+                const pushoverApiToken = document.getElementById('pushoverApiToken').value.trim();
+                const pushoverEnabled = document.getElementById('pushoverSwitch').checked;
+                const selectedSources = Array.from(sourcesContainer.querySelectorAll('input:checked')).map(cb => cb.value);
+
+                // 2. Validate inputs to ensure required keys are present.
+                if (!newsApiKey || !geminiApiKey) {
+                    updateStatus('Error: Please fill in NewsAPI and Gemini API keys.', 'error'); return;
+                }
+                if (pushoverEnabled && (!pushoverUserKey || !pushoverApiToken)) {
+                    updateStatus('Error: Please fill in Pushover keys or disable notifications.', 'error'); return;
+                }
+                if (selectedSources.length === 0) {
+                    updateStatus('Error: Please select at least one news source.', 'error'); return;
+                }
+
+                // 3. Set the UI to a loading state.
+                setLoading(true);
+                clearResults();
+                
+                try {
+                    // 4. Fetch News Articles from NewsAPI.
+                    updateStatus('Fetching business news articles...', 'loading');
+                    const proxyUrl = 'https://corsproxy.io/?'; // CORS proxy to bypass browser restrictions on the free NewsAPI plan.
+                    const query = encodeURIComponent('stocks OR market OR finance OR earnings OR business');
+                    const apiUrl = `https://newsapi.org/v2/everything?q=${query}&sources=${selectedSources.join(',')}&pageSize=10&sortBy=publishedAt&apiKey=${newsApiKey}`;
+                    const newsUrl = proxyUrl + encodeURIComponent(apiUrl);
+
+                    const newsResponse = await fetch(newsUrl);
+                    if (!newsResponse.ok) {
+                        const errorText = await newsResponse.text();
+                        throw new Error(`NewsAPI Error: ${errorText}`);
+                    }
+                    const newsData = await newsResponse.json();
+                    if (!newsData.articles || newsData.articles.length === 0) {
+                       updateStatus('No relevant articles found for the selected sources.', 'warning');
+                       setLoading(false);
+                       return;
+                    }
+                    
+                    // 5. Analyze articles concurrently using the Gemini API.
+                    updateStatus(`Analyzing ${newsData.articles.length} articles...`, 'loading');
+                    allFetchedArticles = await analyzeArticles(newsData.articles, geminiApiKey);
+                    displayArticles(); // Display results immediately after analysis.
+
+                    // 6. Send Pushover notification if the feature is enabled.
+                    if (pushoverEnabled) {
+                        updateStatus('Sending Pushover notification...', 'loading');
+                        await sendPushoverNotification(allFetchedArticles, pushoverUserKey, pushoverApiToken);
+                        updateStatus('Process complete! Notification sent.', 'success');
+                    } else {
+                        updateStatus('Process complete! (Notifications disabled)', 'success');
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    updateStatus(`An error occurred: ${error.message}`, 'error');
+                } finally {
+                    setLoading(false); // Reset UI from loading state, regardless of success or failure.
+                }
+            }
+
+            /**
+             * Analyzes a list of articles in parallel.
+             * @param {Array} articles - The array of article objects from NewsAPI.
+             * @param {string} apiKey - The Gemini API key.
+             * @returns {Promise<Array>} A promise that resolves to an array of articles with analysis data.
+             */
+            async function analyzeArticles(articles, apiKey) {
+                const analysisPromises = articles.map(article => getSentiment(article, apiKey));
+                return Promise.all(analysisPromises);
+            }
+            
+            /**
+             * Gets sentiment and company data for a single article from the Gemini API.
+             * Includes a retry mechanism with exponential backoff for resilience.
+             * @param {Object} article - A single article object.
+             * @param {string} apiKey - The Gemini API key.
+             * @param {number} retries - The number of retry attempts.
+             * @param {number} delay - The initial delay between retries.
+             * @returns {Promise<Object>} A promise that resolves to the article object with an `analysis` key.
+             */
+            async function getSentiment(article, apiKey, retries = 3, delay = 1000) {
+                const textToAnalyze = `${article.title}. ${article.description || ''}`;
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                
+                const prompt = `Analyze the financial news text below. Respond ONLY with a single, valid JSON object with two keys: 'sentiment' ('Positive', 'Negative', or 'Neutral') and 'company' (the primary publicly traded company or stock ticker, or 'N/A'). Example: Text: 'Apple shares surge after strong iPhone sales.' -> {"sentiment": "Positive", "company": "Apple"}. Text: ${textToAnalyze}`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { responseMimeType: "application/json" }
+                };
+
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        if (!response.ok) throw new Error(`Gemini API call failed with status ${response.status}`);
+                        const result = await response.json();
+                        const analysisText = result.candidates[0].content.parts[0].text;
+                        const analysisJson = JSON.parse(analysisText);
+                        return { ...article, analysis: analysisJson };
+                    } catch (error) {
+                        console.error(`Attempt ${i+1} failed for "${article.title}":`, error);
+                        if (i === retries - 1) return { ...article, analysis: { sentiment: 'Error', company: 'Analysis Failed' } };
+                        await new Promise(res => setTimeout(res, delay * Math.pow(2, i))); // Exponential backoff.
+                    }
+                }
+            }
+            
+            // =================================================================
+            // UI RENDERING AND NOTIFICATIONS
+            // =================================================================
+
+            /**
+             * Displays the analyzed articles in the results section, applying any active filters.
+             */
+            function displayArticles() {
+                articlesList.innerHTML = '';
+                if(allFetchedArticles.length === 0){
+                    resultsDiv.querySelector('h2').style.display = 'block';
+                    return;
+                }
+                
+                resultsDiv.querySelector('h2').style.display = 'none';
+                const hideNoCompany = document.getElementById('hideNoCompanySwitch').checked;
+                
+                const sentimentStyles = { 'Positive': 'bg-green-500', 'Negative': 'bg-red-500', 'Neutral': 'bg-gray-400', 'Error': 'bg-yellow-500' };
+
+                let articlesToDisplay = allFetchedArticles;
+                // Filter the articles if the "hide" switch is checked.
+                if (hideNoCompany) {
+                    articlesToDisplay = allFetchedArticles.filter(article => article.analysis?.company !== 'N/A');
+                }
+
+                if(articlesToDisplay.length === 0) {
+                    const messageEl = document.createElement('p');
+                    messageEl.textContent = "No articles with identified companies to display. Toggle the filter to see all results.";
+                    messageEl.className = "text-center text-teal-400";
+                    articlesList.appendChild(messageEl);
+                    return;
+                }
+
+                // Create and append an HTML element for each article.
+                articlesToDisplay.forEach(article => {
+                    const sentiment = article.analysis?.sentiment || 'Neutral';
+                    const company = article.analysis?.company || 'N/A';
+                    const sentimentColor = sentimentStyles[sentiment];
+                    
+                    const articleEl = document.createElement('div');
+                    articleEl.className = 'bg-teal-800 bg-opacity-70 p-4 rounded-lg border border-teal-700';
+                    articleEl.innerHTML = `
+                        <div class="flex items-start">
+                            <div class="sentiment-dot ${sentimentColor} mt-1.5"></div>
+                            <div class="flex-grow">
+                                <a href="${article.url}" target="_blank" rel="noopener noreferrer">
+                                    <h3 class="font-bold text-lg text-teal-300 hover:underline">${article.title}</h3>
+                                </a>
+                                <div class="flex flex-wrap items-center text-sm text-teal-400 mt-1 gap-x-4">
+                                    <span>Source: ${article.source.name}</span>
+                                    <span class="font-semibold">Company: <span class="text-white">${company}</span></span>
+                                </div>
+                                <p class="text-gray-300 mt-2 text-sm">${article.description || ''}</p>
+                            </div>
+                        </div>
+                    `;
+                    articlesList.appendChild(articleEl);
+                });
+            }
+            
+            /**
+             * Sends a formatted notification to the Pushover service.
+             * @param {Array} articles - The array of analyzed articles.
+             * @param {string} userKey - The Pushover user key.
+             * @param {string} apiToken - The Pushover API token/key.
+             */
+            async function sendPushoverNotification(articles, userKey, apiToken) {
+                const title = "AI News Sentiment Report";
+                let message = articles.slice(0, 5).map(a => {
+                    if (!a.analysis) return null;
+                    const sentimentIcon = {'Positive': '🟢', 'Negative': '🔴', 'Neutral': '⚪'}[a.analysis.sentiment] || '🟡';
+                    return `${sentimentIcon} [${a.analysis.company}] ${a.title}`;
+                }).filter(Boolean).join('\n');
+
+                if (!message) return; // Do not send an empty notification.
+
+                const formData = new FormData();
+                formData.append('token', apiToken); formData.append('user', userKey);
+                formData.append('title', title); formData.append('message', message);
+
+                try {
+                    const response = await fetch('https://api.pushover.net/1/messages.json', { method: 'POST', body: formData });
+                    if (!response.ok) throw new Error(`Pushover Error: ${(await response.json()).errors.join(', ')}`);
+                } catch (error) {
+                    updateStatus(error.message, 'error');
+                    console.error(error);
+                }
+            }
+            
+            // =================================================================
+            // HELPER FUNCTIONS
+            // =================================================================
+
+            /**
+             * Updates the status message text and color.
+             * @param {string} message - The message to display.
+             * @param {string} type - The type of message (e.g., 'error', 'success').
+             */
+            function updateStatus(message, type = 'info') {
+                statusDiv.textContent = message;
+                statusDiv.className = 'mt-4 h-6 transition-colors duration-300 ';
+                const colorMap = {'error': 'text-red-400', 'success': 'text-green-400', 'warning': 'text-yellow-400', 'loading': 'text-teal-300', 'info': 'text-teal-400'};
+                statusDiv.classList.add(colorMap[type] || 'text-teal-400');
+            }
+
+            /**
+             * Toggles the UI's loading state.
+             * @param {boolean} isLoading - Whether the app is currently loading.
+             */
+            function setLoading(isLoading) {
+                fetchBtn.disabled = isLoading;
+                btnText.textContent = isLoading ? 'Processing...' : 'Fetch, Analyze & Notify';
+                loader.classList.toggle('hidden', !isLoading);
+                fetchBtn.classList.toggle('cursor-not-allowed', isLoading);
+                fetchBtn.classList.toggle('opacity-70', isLoading);
+            }
+
+            /**
+             * Clears the results from the UI and the master article list.
+             */
+            function clearResults() {
+                allFetchedArticles = [];
+                articlesList.innerHTML = '';
+                resultsDiv.querySelector('h2').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
+
